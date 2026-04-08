@@ -1,0 +1,41 @@
+---
+title: Narrative Omission Detection
+emoji: 🔍
+colorFrom: red
+colorTo: orange
+sdk: docker
+pinned: false
+app_port: 8000
+base_path: /web
+tags:
+  - openenv
+---
+
+spec_version: 1
+name: narrative_omission_env
+type: space
+runtime: fastapi
+app: server.app:app
+port: 8000
+description: >
+  An RL environment where agents learn to detect deliberate narrative omissions
+  across multiple synthetic news sources covering the same event. Agents must
+  read, cross-reference, and identify structural gaps — then synthesize a
+  complete picture of what biased sources collectively hide.
+author: harsh
+tasks:
+  - name: easy
+    description: "Single source omits the responsible party. 3 sources, 10 steps."
+    difficulty: easy
+    max_steps: 10
+  - name: medium
+    description: "Multi-field omissions with misleading credibility signals. 4 sources, 15 steps."
+    difficulty: medium
+    max_steps: 15
+  - name: hard
+    description: "Adversarial omissions with a red herring source. 4 sources, 20 steps."
+    difficulty: hard
+    max_steps: 20
+action_space: NarrativeAction
+observation_space: NarrativeObservation
+reward_range: [0.0, 1.0]
