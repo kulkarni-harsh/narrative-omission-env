@@ -1,6 +1,6 @@
 ---
 title: Narrative Omission Env Environment Server
-emoji: 🎭
+emoji: 🔍
 colorFrom: purple
 colorTo: pink
 sdk: docker
@@ -9,247 +9,128 @@ app_port: 8000
 base_path: /web
 tags:
   - openenv
+  - rl-environment
+  - media-literacy
 ---
 
-# Narrative Omission Env Environment
+# 🔍 Narrative Omission Detection Environment
 
-A simple test environment that echoes back messages. Perfect for testing the env APIs as well as demonstrating environment usage patterns.
+An RL environment where agents learn to detect **deliberate narrative omissions** across multiple synthetic news sources covering the same event. Agents must read, cross-reference, and identify structural gaps — then synthesize a complete picture of what biased sources collectively hide.
 
-## Quick Start
-
-The simplest way to use the Narrative Omission Env environment is through the `NarrativeOmissionEnv` class:
+## Quick Start (Python)
 
 ```python
-from narrative_omission_env import NarrativeOmissionAction, NarrativeOmissionEnv
+from narrative_omission_env import NarrativeAction, NarrativeOmissionEnv
 
-try:
-    # Create environment from Docker image
-    narrative_omission_envenv = NarrativeOmissionEnv.from_docker_image("narrative_omission_env-env:latest")
+env = NarrativeOmissionEnv(base_url="<SPACE_URL>")
+obs = env.reset()
+print(obs.available_sources)  # ['src_0', 'src_1', 'src_2']
 
-    # Reset
-    result = narrative_omission_envenv.reset()
-    print(f"Reset: {result.observation.echoed_message}")
+# Read all sources
+for src in obs.available_sources:
+    result = env.step(NarrativeAction(action_type="read_source", source_id=src))
 
-    # Send multiple messages
-    messages = ["Hello, World!", "Testing echo", "Final message"]
+# Cross-reference two sources
+result = env.step(NarrativeAction(
+    action_type="cross_reference",
+    source_id="src_0",
+    source_id_b="src_1",
+))
 
-    for msg in messages:
-        result = narrative_omission_envenv.step(NarrativeOmissionAction(message=msg))
-        print(f"Sent: '{msg}'")
-        print(f"  → Echoed: '{result.observation.echoed_message}'")
-        print(f"  → Length: {result.observation.message_length}")
-        print(f"  → Reward: {result.reward}")
+# Identify a gap
+result = env.step(NarrativeAction(
+    action_type="identify_gap",
+    source_id="src_0",
+    claimed_omitted_field="responsible_party",
+))
 
-finally:
-    # Always clean up
-    narrative_omission_envenv.close()
+# Submit final analysis
+result = env.step(NarrativeAction(
+    action_type="synthesize",
+    synthesis={
+        "responsible_party": "NovaChem Industries",
+        "omitted_fields": ["responsible_party", "cover_up_detail"],
+        "cover_up_detail": "Internal memos show management knew about the corroded valves",
+    },
+))
+print(result.observation.synthesis_feedback)
 ```
 
-That's it! The `NarrativeOmissionEnv.from_docker_image()` method handles:
-- Starting the Docker container
-- Waiting for the server to be ready
-- Connecting to the environment
-- Container cleanup when you call `close()`
+## Action Space
 
-## Building the Docker Image
+**NarrativeAction** fields:
 
-Before using the environment, you need to build the Docker image:
+| Field | Type | Description |
+|-------|------|-------------|
+| `action_type` | Literal | One of: `read_source`, `cross_reference`, `identify_gap`, `synthesize`, `skip` |
+| `source_id` | str \| None | Source to read, cross-reference, or identify gap in |
+| `source_id_b` | str \| None | Second source for `cross_reference` |
+| `claimed_omitted_field` | str \| None | Field claimed omitted (for `identify_gap`) |
+| `synthesis` | dict \| None | Final analysis dict (for `synthesize`) |
 
-```bash
-# From project root
-docker build -t narrative_omission_env-env:latest -f server/Dockerfile .
-```
+**Synthesis dict keys:**
+- `responsible_party` (str) — who is responsible
+- `omitted_fields` (list[str]) — fields hidden across sources
+- `cover_up_detail` (str) — the key suppressed fact
+- `red_herring_source` (str, hard only) — which source was a distraction
 
-## Deploying to Hugging Face Spaces
+## Observation Space
 
-You can easily deploy your OpenEnv environment to Hugging Face Spaces using the `openenv push` command:
+**NarrativeObservation** fields:
 
-```bash
-# From the environment directory (where openenv.yaml is located)
-openenv push
+| Field | Type | Description |
+|-------|------|-------------|
+| `available_sources` | list[str] | Source IDs in this episode |
+| `sources_read` | list[str] | Sources the agent has read |
+| `last_action_result` | str | Text feedback from last action |
+| `step_count` | int | Current step number |
+| `max_steps` | int | Step budget for this task |
+| `budget_remaining` | float | Normalized budget (0–1) |
+| `gaps_correctly_identified` | int | Correct `identify_gap` calls so far |
+| `done` | bool | Episode complete? |
+| `reward` | float | Reward from last step |
+| `synthesis_feedback` | str \| None | Final scoring breakdown |
 
-# Or specify options
-openenv push --namespace my-org --private
-```
+## Reward Structure
 
-The `openenv push` command will:
-1. Validate that the directory is an OpenEnv environment (checks for `openenv.yaml`)
-2. Prepare a custom build for Hugging Face Docker space (enables web interface)
-3. Upload to Hugging Face (ensuring you're logged in)
+| Action | Reward |
+|--------|--------|
+| Read new source | +0.05 |
+| Cross-reference (gap found) | +0.10 |
+| Identify gap correctly | +0.20 |
+| Identify gap incorrectly | −0.10 |
+| Skip | −0.02 |
+| Synthesize | up to 1.0 |
+| Efficiency decay (step > 12) | −0.01/step |
 
-### Prerequisites
+## Task Difficulties
 
-- Authenticate with Hugging Face: The command will prompt for login if not already authenticated
+| Task | Sources | Max Steps | Notes |
+|------|---------|-----------|-------|
+| `easy` | 3 | 10 | One source omits `responsible_party` |
+| `medium` | 4 | 15 | Multi-field omissions, misleading credibility signals |
+| `hard` | 4 | 20 | One source is a red herring distraction |
 
-### Options
+Set via environment variable: `TASK_NAME=medium`
 
-- `--directory`, `-d`: Directory containing the OpenEnv environment (defaults to current directory)
-- `--repo-id`, `-r`: Repository ID in format 'username/repo-name' (defaults to 'username/env-name' from openenv.yaml)
-- `--base-image`, `-b`: Base Docker image to use (overrides Dockerfile FROM)
-- `--private`: Deploy the space as private (default: public)
+## About the News Data
 
-### Examples
+Events are **synthetically generated** from 20 curated templates (industrial accidents, political decisions, corporate actions, public health incidents) combined with 6 bias profiles. A pool of 200 deterministic events is built at startup (seed=42). No external APIs are used — the environment is fully self-contained and reproducible.
 
-```bash
-# Push to your personal namespace (defaults to username/env-name from openenv.yaml)
-openenv push
+## Web Interface
 
-# Push to a specific repository
-openenv push --repo-id my-org/my-env
+The Space includes an interactive **Investigative Analyst** playground at `/web`:
+- Step-by-step guided workflow with tabs for each action type
+- Formatted article cards per source
+- Contextual dropdowns (source IDs, omittable fields)
+- Progress tracker and scoring display
+- Synthesis form with checkboxes for omitted fields
 
-# Push with a custom base image
-openenv push --base-image ghcr.io/meta-pytorch/openenv-base:latest
+## API Endpoints
 
-# Push as a private space
-openenv push --private
-
-# Combine options
-openenv push --repo-id my-org/my-env --base-image custom-base:latest --private
-```
-
-After deployment, your space will be available at:
-`https://huggingface.co/spaces/<repo-id>`
-
-The deployed space includes:
-- **Web Interface** at `/web` - Interactive UI for exploring the environment
-- **API Documentation** at `/docs` - Full OpenAPI/Swagger interface
-- **Health Check** at `/health` - Container health monitoring
-- **WebSocket** at `/ws` - Persistent session endpoint for low-latency interactions
-
-## Environment Details
-
-### Action
-**NarrativeOmissionAction**: Contains a single field
-- `message` (str) - The message to echo back
-
-### Observation
-**NarrativeOmissionObservation**: Contains the echo response and metadata
-- `echoed_message` (str) - The message echoed back
-- `message_length` (int) - Length of the message
-- `reward` (float) - Reward based on message length (length × 0.1)
-- `done` (bool) - Always False for echo environment
-- `metadata` (dict) - Additional info like step count
-
-### Reward
-The reward is calculated as: `message_length × 0.1`
-- "Hi" → reward: 0.2
-- "Hello, World!" → reward: 1.3
-- Empty message → reward: 0.0
-
-## Advanced Usage
-
-### Connecting to an Existing Server
-
-If you already have a Narrative Omission Env environment server running, you can connect directly:
-
-```python
-from narrative_omission_env import NarrativeOmissionEnv
-
-# Connect to existing server
-narrative_omission_envenv = NarrativeOmissionEnv(base_url="<ENV_HTTP_URL_HERE>")
-
-# Use as normal
-result = narrative_omission_envenv.reset()
-result = narrative_omission_envenv.step(NarrativeOmissionAction(message="Hello!"))
-```
-
-Note: When connecting to an existing server, `narrative_omission_envenv.close()` will NOT stop the server.
-
-### Using the Context Manager
-
-The client supports context manager usage for automatic connection management:
-
-```python
-from narrative_omission_env import NarrativeOmissionAction, NarrativeOmissionEnv
-
-# Connect with context manager (auto-connects and closes)
-with NarrativeOmissionEnv(base_url="http://localhost:8000") as env:
-    result = env.reset()
-    print(f"Reset: {result.observation.echoed_message}")
-    # Multiple steps with low latency
-    for msg in ["Hello", "World", "!"]:
-        result = env.step(NarrativeOmissionAction(message=msg))
-        print(f"Echoed: {result.observation.echoed_message}")
-```
-
-The client uses WebSocket connections for:
-- **Lower latency**: No HTTP connection overhead per request
-- **Persistent session**: Server maintains your environment state
-- **Efficient for episodes**: Better for many sequential steps
-
-### Concurrent WebSocket Sessions
-
-The server supports multiple concurrent WebSocket connections. To enable this,
-modify `server/app.py` to use factory mode:
-
-```python
-# In server/app.py - use factory mode for concurrent sessions
-app = create_app(
-    NarrativeOmissionEnvironment,  # Pass class, not instance
-    NarrativeOmissionAction,
-    NarrativeOmissionObservation,
-    max_concurrent_envs=4,  # Allow 4 concurrent sessions
-)
-```
-
-Then multiple clients can connect simultaneously:
-
-```python
-from narrative_omission_env import NarrativeOmissionAction, NarrativeOmissionEnv
-from concurrent.futures import ThreadPoolExecutor
-
-def run_episode(client_id: int):
-    with NarrativeOmissionEnv(base_url="http://localhost:8000") as env:
-        result = env.reset()
-        for i in range(10):
-            result = env.step(NarrativeOmissionAction(message=f"Client {client_id}, step {i}"))
-        return client_id, result.observation.message_length
-
-# Run 4 episodes concurrently
-with ThreadPoolExecutor(max_workers=4) as executor:
-    results = list(executor.map(run_episode, range(4)))
-```
-
-## Development & Testing
-
-### Direct Environment Testing
-
-Test the environment logic directly without starting the HTTP server:
-
-```bash
-# From the server directory
-python3 server/narrative_omission_env_environment.py
-```
-
-This verifies that:
-- Environment resets correctly
-- Step executes actions properly
-- State tracking works
-- Rewards are calculated correctly
-
-### Running Locally
-
-Run the server locally for development:
-
-```bash
-uvicorn server.app:app --reload
-```
-
-## Project Structure
-
-```
-narrative_omission_env/
-├── .dockerignore         # Docker build exclusions
-├── __init__.py            # Module exports
-├── README.md              # This file
-├── openenv.yaml           # OpenEnv manifest
-├── pyproject.toml         # Project metadata and dependencies
-├── uv.lock                # Locked dependencies (generated)
-├── client.py              # NarrativeOmissionEnv client
-├── models.py              # Action and Observation models
-└── server/
-    ├── __init__.py        # Server module exports
-    ├── narrative_omission_env_environment.py  # Core environment logic
-    ├── app.py             # FastAPI application (HTTP + WebSocket endpoints)
-    └── Dockerfile         # Container image definition
-```
+- `POST /reset` — start a new episode
+- `POST /step` — take an action
+- `GET /state` — get current state
+- `GET /health` — health check
+- `GET /docs` — OpenAPI documentation
+- `WS /ws` — WebSocket for low-latency sessions

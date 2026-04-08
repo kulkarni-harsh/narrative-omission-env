@@ -12,9 +12,11 @@ except Exception as e:  # pragma: no cover
 try:
     from ..models import NarrativeAction, NarrativeObservation
     from .narrative_omission_env_environment import NarrativeEnvironment
+    from .gradio_app import build_narrative_gradio_app
 except ImportError:
     from models import NarrativeAction, NarrativeObservation
     from server.narrative_omission_env_environment import NarrativeEnvironment
+    from server.gradio_app import build_narrative_gradio_app
 
 
 def env_factory() -> NarrativeEnvironment:
@@ -28,6 +30,7 @@ app = create_app(
     NarrativeObservation,
     env_name="narrative_omission",
     max_concurrent_envs=4,
+    gradio_builder=build_narrative_gradio_app,
 )
 
 
