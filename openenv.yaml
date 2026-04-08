@@ -25,4 +25,4 @@ tasks:
     max_steps: 20
 action_space: NarrativeAction
 observation_space: NarrativeObservation
-reward_range: [0.0, 1.0]
+reward_range: [-0.1, 1.0]

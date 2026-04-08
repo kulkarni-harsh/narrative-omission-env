@@ -6,14 +6,9 @@ from typing import Dict, Optional
 
 from openenv.core.env_server.interfaces import Environment
 
-try:
-    from ..models import NarrativeAction, NarrativeObservation, NarrativeState
-    from .event_generator import EventGenerator
-    from .tasks import TASK_CONFIG, grade_task
-except ImportError:  # running as server.app (flat)
-    from models import NarrativeAction, NarrativeObservation, NarrativeState
-    from server.event_generator import EventGenerator
-    from server.tasks import TASK_CONFIG, grade_task
+from models import NarrativeAction, NarrativeObservation, NarrativeState
+from server.event_generator import EventGenerator
+from server.tasks import TASK_CONFIG, grade_task
 
 
 class NarrativeEnvironment(Environment):
@@ -102,7 +97,6 @@ class NarrativeEnvironment(Environment):
 
         if self._state.step_count >= self._state.max_steps:
             done = True
-        self._state.done = done if hasattr(self._state, "done") else done
 
         return NarrativeObservation(
             available_sources=list(self._articles.keys()),

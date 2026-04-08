@@ -495,10 +495,7 @@ class EventGenerator:
         self, task_name: str
     ) -> Tuple[EventGroundTruth, Dict[str, dict]]:
         """Sample a random event appropriate for the given task."""
-        try:
-            from .tasks import TASK_CONFIG
-        except ImportError:
-            from server.tasks import TASK_CONFIG
+        from server.tasks import TASK_CONFIG
         config = TASK_CONFIG[task_name]
         num_sources = config["num_sources"]
         has_red_herring = config.get("has_red_herring", False)

@@ -22,7 +22,8 @@ from typing import List, Optional
 
 from openai import OpenAI
 
-from narrative_omission_env import NarrativeAction, NarrativeEnv, NarrativeObservation
+from models import NarrativeAction, NarrativeObservation
+from client import NarrativeEnv
 
 # ---------------------------------------------------------------------------
 # Configuration
@@ -295,7 +296,9 @@ async def main() -> None:
                 step=step, action=action_str(act), reward=reward, done=result.done, error=None
             )
 
-        score = sum(rewards)
+        # Final score is the last reward (synthesis grade from grade_task), not the cumulative sum.
+        # Fallback to accumulated sum capped at 1.0 if synthesis was never reached.
+        score = rewards[-1] if rewards else 0.0
         score = min(max(score, 0.0), 1.0)
         success = score >= SUCCESS_SCORE_THRESHOLD
 
