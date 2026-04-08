@@ -21,18 +21,10 @@ RUN if ! command -v uv >/dev/null 2>&1; then \
     fi
 
 RUN --mount=type=cache,target=/root/.cache/uv \
-    if [ -f uv.lock ]; then \
-        uv sync --frozen --no-install-project --no-editable; \
-    else \
-        uv sync --no-install-project --no-editable; \
-    fi
+    uv sync --no-lock --no-install-project --no-editable
 
 RUN --mount=type=cache,target=/root/.cache/uv \
-    if [ -f uv.lock ]; then \
-        uv sync --frozen --no-editable; \
-    else \
-        uv sync --no-editable; \
-    fi
+    uv sync --no-lock --no-editable
 
 FROM ${BASE_IMAGE}
 
