@@ -1,3 +1,13 @@
+---
+title: Narrative Omission Env
+emoji: 🔍
+colorFrom: blue
+colorTo: indigo
+sdk: docker
+app_port: 8000
+pinned: false
+---
+
 # Narrative Omission Detection Environment
 
 An RL environment where agents learn to detect **deliberate narrative omissions** across multiple synthetic news sources covering the same event. Agents must read, cross-reference, and identify structural gaps — then synthesize a complete picture of what biased sources collectively hide.
